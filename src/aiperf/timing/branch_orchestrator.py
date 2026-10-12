@@ -316,7 +316,7 @@ class BranchOrchestrator:
         # child x_correlation_id -> (child session, parent x_correlation_id).
         # Their bookkeeping is registered at spawn time, so when the phase
         # stops sending (and cancels their timers) they must be rolled back
-        # explicitly; see _abandon_delayed_children.
+        # explicitly; see _abandon_cancelled_child_dispatches.
         self._pending_delayed_children: dict[str, tuple[Any, str]] = {}
         # Children whose next turn waits on a strategy-owned scheduler timer
         # (think-time continuations, snapshot-seeded turns). Stopped
@@ -1528,7 +1528,7 @@ class BranchOrchestrator:
         """
         self._parked_child_turns.add(child_x_correlation_id)
 
-    def unpark_child_turn(self, child_x_correlation_id: str) -> bool:
+    def try_claim_parked_child_turn(self, child_x_correlation_id: str) -> bool:
         """Claim a parked child turn as its timer fires.
 
         Returns False when the child was already stopped at the sending
@@ -1539,7 +1539,7 @@ class BranchOrchestrator:
         self._parked_child_turns.discard(child_x_correlation_id)
         return True
 
-    async def _abandon_delayed_children(self) -> None:
+    async def _abandon_cancelled_child_dispatches(self) -> None:
         """Release children whose next dispatch was cancelled with the scheduler.
 
         Called once the phase stops sending. ``PhaseRunner`` cancels the
@@ -1585,7 +1585,7 @@ class BranchOrchestrator:
         Delayed child dispatches cancelled at the same boundary are rolled
         back first so the joins they gated can drain.
         """
-        await self._abandon_delayed_children()
+        await self._abandon_cancelled_child_dispatches()
         releasable: list[PendingBranchJoin] = []
         for parent_corr, pending in list(self._active_joins.items()):
             pending.replay_deadline_elapsed = True
