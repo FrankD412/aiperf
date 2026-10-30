@@ -288,6 +288,8 @@ class MetricsAccumulator(BaseMetricsProcessor):
         """
         if not self._acceptance_pool_by_phase:
             return None
+        if ctx is not None and ctx.min_request_start_ns is not None:
+            return None
         if ctx is not None and ctx.phase is not None:
             phase = str(ctx.phase)
             selected = [
@@ -333,6 +335,8 @@ class MetricsAccumulator(BaseMetricsProcessor):
         ``requests_end_ns`` and fail a strict ``start_ns < end_ns`` check.
         Phase-less contexts (realtime rolling windows) keep the half-open
         ``[start_ns, end_ns)`` semantics so adjacent windows never overlap.
+        Suffix-window exports add ``min_request_start_ns``, a lower bound only,
+        so the phase's own end semantics are unchanged.
         """
         if ctx is None:
             return None
@@ -350,6 +354,8 @@ class MetricsAccumulator(BaseMetricsProcessor):
                 mask &= self._column_store.mask_for_categorical(
                     "phase_index", str(ctx.phase_index)
                 )
+            if ctx.min_request_start_ns is not None:
+                mask &= self._column_store.start_ns[:n] >= ctx.min_request_start_ns
             return mask
         if ctx.start_ns is not None:
             mask &= self._column_store.start_ns[:n] >= ctx.start_ns
@@ -709,6 +715,7 @@ class MetricsAccumulator(BaseMetricsProcessor):
         *,
         include_timeslices: bool,
         include_sweeps: bool = True,
+        include_run_scoped: bool = True,
     ) -> AccumulatorMetricsSummary:
         mask = self._mask_for_export_context(ctx)
 
@@ -718,6 +725,7 @@ class MetricsAccumulator(BaseMetricsProcessor):
             mask,
             window_start_ns=window_start_ns,
             window_end_ns=window_end_ns,
+            is_timeslice=not include_run_scoped,
         )
 
         timeslices: list[TimesliceResult] | None = None
@@ -766,19 +774,19 @@ class MetricsAccumulator(BaseMetricsProcessor):
                 )
             # Run-scoped replay send-lag family (fixed-schedule only): anchored at
             # the run-global least-late request, so computed once over the masked
-            # offset column, never per timeslice.
-            inject_replay_sched_lag_metrics(
-                self._column_store,
-                overall_results,
-                mask=mask,
-                warn_degraded=self._warn_replay_degraded,
-            )
+            # offset column, never per timeslice or suffix window.
+            if include_run_scoped:
+                inject_replay_sched_lag_metrics(
+                    self._column_store,
+                    overall_results,
+                    mask=mask,
+                    warn_degraded=self._warn_replay_degraded,
+                )
             # E2E Normalized Interactivity (AgentX/InferenceX Pareto x-axis):
             # 1 / p(request_latency_s / OSL), request-weighted over the masked
-            # columns. Reported run-scoped (not per timeslice) to match InferenceX,
-            # which defines this x-axis at run level only -- unlike the send-lag
-            # family above, the value is well-defined per slice, so per-slice
-            # support is a possible follow-up, not a correctness constraint.
+            # columns. Not computed per timeslice, to match InferenceX's run-level
+            # definition; it is well-defined over any request subset, so suffix
+            # windows carry it alongside their other summary metrics.
             inject_e2e_normalized_interactivity_metrics(
                 self._column_store,
                 overall_results,
@@ -798,6 +806,19 @@ class MetricsAccumulator(BaseMetricsProcessor):
     async def export_results(self, ctx: ExportContext) -> AccumulatorMetricsSummary:
         """Export final metrics results for the requested phase/window."""
         return self._summarize_for_export_context(ctx, include_timeslices=True)
+
+    async def export_window_results(
+        self, ctx: ExportContext
+    ) -> AccumulatorMetricsSummary:
+        """Export one suffix window.
+
+        Timeslices and metrics anchored to a run-global reference (the replay
+        send-lag family) remain whole-run artifacts: re-anchoring them per
+        window would hide drift that started before the window.
+        """
+        return self._summarize_for_export_context(
+            ctx, include_timeslices=False, include_run_scoped=False
+        )
 
     def _inject_sweep_metrics(
         self,

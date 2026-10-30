@@ -367,6 +367,10 @@ SINGLE_VALUED_FIELDS: frozenset[str] = frozenset(
         # a field to the value it already has cannot change anything -- so no
         # observation here can distinguish routed from dropped.
         "wait_for_model_mode",
+        # Same shape: True requires an agentic_replay profiling phase, which
+        # neither fixture has, so it raises; False is the default. Routing under
+        # --config is covered by test_agentic_replay_phase_override.py.
+        "agentic_warmup",
     }
 )
 
