@@ -1207,6 +1207,7 @@ async def test_warmup_spreads_globally_aligned_on_t_star_by_default():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = trajectories
 
     issued: list[str] = []
@@ -1295,6 +1296,7 @@ async def test_warmup_lead_clamped_to_idle_gap_cap():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = trajectories
 
     issued: list[str] = []
@@ -1539,6 +1541,7 @@ async def test_profiling_snapshot_dispatches_inflight_child_and_seeds_join():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = [trajectory]
 
     issued: list[tuple[str, int, int, str, str | None]] = []
@@ -1679,6 +1682,7 @@ def _burst_two_child_snapshot_source() -> TrajectorySource:
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = [trajectory]
     return src
 
@@ -1850,6 +1854,7 @@ async def test_profiling_global_anchor_preserves_subagent_spacing():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = [trajectory]
 
     issued: list[str] = []
@@ -1972,6 +1977,7 @@ async def test_profiling_globally_anchors_earliest_request_preserving_spacing():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = trajectories
 
     issued: list[tuple[str, int]] = []
@@ -2066,6 +2072,7 @@ async def test_profiling_gated_parent_not_dispatched_child_profiles():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = [trajectory]
 
     issued: list[tuple[str, int]] = []
@@ -2142,6 +2149,7 @@ async def test_profiling_single_turn_root_profiles_its_own_turn_zero():
     src._dataset_metadata = ds
     src._dataset_sampler = MagicMock()
     src._metadata_lookup = {c.conversation_id: c for c in ds.conversations}
+    src._random_seed = 0
     src.trajectories = [trajectory]
     issued = []
 
